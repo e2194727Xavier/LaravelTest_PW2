@@ -80,7 +80,7 @@ class SAQService
         }
        }
         
-        return new JsonResponse($results);
+        return $results;
     }
 
     private function get_inner_html($node) {
@@ -205,16 +205,19 @@ class SAQService
         $pages = 345;
         $perPage = 24;
         $currentPage = 1;
+        $results = [];
     
         set_time_limit(0); // Disable script execution time limit
     
         while ($currentPage <= $pages) {
-            $this->getProduits($perPage, $currentPage);
+            $pageResults = $this->getProduits($perPage, $currentPage);
+            $results = array_merge($results, $pageResults);
             $currentPage++;
     
             // Optionally, add a delay between iterations to avoid overwhelming the server
             usleep(100000); // Sleep for 100 milliseconds (adjust the delay as needed)
         }
+        return $results; 
     }
 
     
