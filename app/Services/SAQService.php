@@ -99,11 +99,37 @@ class SAQService
 		return preg_replace('/\s+/', ' ',$chaine);
 	}
 
+    private function getTypeID($typeName)
+	{
+        //Vérification de l'existance du type, s'il n'existe pas, on va le créer, sinon on renvoie la clé. 
+        $type = Type::firstOrCreate(['name' => $typeName]);
+        return $type->id;
+
+	}
+
+    private function getCountryId($countryName)
+	{
+        //Vérification de l'existance du pays, s'il n'existe pas, on va le créer, sinon on renvoie la clé. 
+        $country = Country::firstOrCreate(['name' => $countryName]);
+        return $country->id;
+	}
+
+
+
+
 
     private function recupereInfo($noeud)
     {
         $info = new stdClass();
-        $info -> img = $noeud -> getElementsByTagName("img") -> item(0) -> getAttribute('src');
+        $images = $noeud->getElementsByTagName("img");
+
+    foreach ($images as $img) {
+        $class = $img->getAttribute('class');
+        if (strpos($class, 'product-image-photo') !== false) {
+            $info->img = $img->getAttribute('src');
+            break;
+        }
+    }
         $a_titre = $noeud -> getElementsByTagName("a") -> item(0);
 		$info -> url = $a_titre->getAttribute('href');
 
@@ -120,9 +146,9 @@ class SAQService
 				$aDesc = explode("|", $info->desc->texte); // Type, Format, Pays
 				if (count ($aDesc) == 3) {
 					
-					$info -> desc -> type = trim($aDesc[0]);
+					$info -> desc -> type_id = getTypeId(trim($aDesc[0]));
 					$info -> desc -> format = trim($aDesc[1]);
-					$info -> desc -> pays = trim($aDesc[2]);
+					$info -> desc -> country_id = getCountryId(trim($aDesc[2]));
 				}
 				
 				$info -> desc -> texte = trim($info -> desc -> texte);
@@ -150,9 +176,7 @@ class SAQService
 				$prix= trim($node -> textContent);
                 $prix_nettoyer = str_replace("$","",$prix);
                 $prix_point= str_replace(',',".",$prix_nettoyer);
-                $info->prix = floatval($prix_point);
-                
-                
+                $info->prix = floatval($prix_point);   
 			}
 		}
 		//var_dump($info);
@@ -162,43 +186,42 @@ class SAQService
 
 
 
-    private function ajouteProduit($bte)
-    {
-        $retour = new stdClass();
-        $retour->succes = false;
-        $retour->raison = '';
+   private function ajouteProduit($bte)
+{
+    $retour = new stdClass();
+    $retour->succes = false;
+    $retour->raison = '';
 
-        $type = Type::where('type', $bte->desc->type)->first();
+        $rows = Bouteille::where('code_saq', $bte->desc->code_SAQ)->count();
 
-        if ($type) {
-            $rows = Bouteille::where('code_saq', $bte->desc->code_SAQ)->count();
+        if ($rows < 1) {
+            $nouvelleBouteille = new Bouteille();
+            $nouvelleBouteille->nom = $bte->nom;
+            $nouvelleBouteille->type_id = $bte->desc->type_id;  
+            $nouvelleBouteille->image = $bte->img;
+            $nouvelleBouteille->code_saq = $bte->desc->code_SAQ;
+            $nouvelleBouteille->pays_id = $bte->desc->pays_id;  
+            $nouvelleBouteille->description = $bte->desc->texte;
+            $nouvelleBouteille->prix_saq = $bte->prix;
+            $nouvelleBouteille->url_saq = $bte->url;
+            $nouvelleBouteille->url_img = $bte->img;
+            $nouvelleBouteille->format = $bte->desc->format;
 
-            if ($rows < 1) {
-                $nouvelleBouteille = new Bouteille();
-                $nouvelleBouteille->nom = $bte->nom;
-                $nouvelleBouteille->type = $type->id;
-                $nouvelleBouteille->image = $bte->img;
-                $nouvelleBouteille->code_saq = $bte->desc->code_SAQ;
-                $nouvelleBouteille->pays = $bte->desc->pays;
-                $nouvelleBouteille->description = $bte->desc->texte;
-                $nouvelleBouteille->prix_saq = $bte->prix;
-                $nouvelleBouteille->url_saq = $bte->url;
-                $nouvelleBouteille->url_img = $bte->img;
-                $nouvelleBouteille->format = $bte->desc->format;
-
+            try {
                 $retour->succes = $nouvelleBouteille->save();
                 $retour->raison = self::INSERE;
-            } else {
+            } catch (\Exception $e) {
                 $retour->succes = false;
-                $retour->raison = self::DUPLICATION;
+                $retour->raison = $e->getMessage();
             }
         } else {
             $retour->succes = false;
-            $retour->raison = self::ERREURDB;
+            $retour->raison = self::DUPLICATION;
         }
 
-        return $retour;
-    }
+    return $retour;
+}
+
 
     public function fetchProduit()
     {

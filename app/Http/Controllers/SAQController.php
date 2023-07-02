@@ -15,5 +15,7 @@ class SAQController extends Controller
             return response()->json(['results' => $results]);
         
     }
+
+    
 }
 
